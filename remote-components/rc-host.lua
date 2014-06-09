@@ -57,14 +57,14 @@ local function onPacket(...)
     if arg[4]~=123 then return end
     local packet = utils.unserialize(arg[6])
     if packet ~=nil and packet.action~=nil and packet.id~=nil then 
-        if packet.action == "proxy" and packet.address ~= nil then
+        if packet.action == "proxy" and packet.address ~= nil and remote[packet.address]~=nil then
             local data = createPacket("component_wrap",packet.id,remote[packet.address],true)
             modem.send(arg[3],port,data)
         end
         
         local status
         local response
-        if packet.action == "invoke" and packet.address ~= nil and packet.func ~= nil then
+        if packet.action == "invoke" and packet.address ~= nil and packet.func ~= nil and remote[packet.address]~=nil then
             if packet.arg~=nil then
                 status, response = pcall(function() return component.invoke(packet.address,packet.func,table.unpack(packet.arg))end)
             else

@@ -10,41 +10,56 @@ local rc ={}
 
 modem.open(port)
 
-local function send(packet,t)
-    local cId = packet.id
+local function send(packet,actionTypeSend,actionTypeRecive)
+    local cId = tID
+    tID=tID+1
     local id = nil
     local response = nil
     local i = 0
-    modem.broadcast(port,utils.serialize(packet))
+    modem.broadcast(port,cId,actionTypeSend,utils.serialize(packet))
     while id ~=cId and i<retry do
-        local _,_,_,p,_,pack = event.pull(3,"modem_message")
-        if p~=port then return end
-        response = utils.unserialize(pack)
-        if response~=nil and response.action==t then
-            id = response.id
+        local typ,receiverAddress,senderAddress,reciverPort,distance,idr,action,data = event.pull(timeout,"modem_message",nil,nil,port,nil,cId,actionTypeRecive)
+        if(data~=nil)then
+          response = utils.unserialize(data)
         end
+        id=idr
         i=i+1
+    end  
+    if response~=nil then
+      return response.data,response.status
+    else
+      return nil
     end
-    
-    return response.data,response.status
 end
 
-local function createPacket(action,id,address,data,stat)
-    tID=tID+1
+local function createPacket(address,data,stat)
     local packet = {}
-    packet.id = id
-    packet.action = action
     packet.data = data
     packet.status= stat
     packet.address = address
     return packet
 end
 
+function tableMerge(t1, t2)
+    for k,v in pairs(t2) do
+      if type(v) == "table" then
+        if type(t1[k] or false) == "table" then
+          tableMerge(t1[k] or {}, t2[k] or {})
+        else
+          t1[k] = v
+        end
+      else
+        t1[k] = v
+      end
+    end
+    return t1
+end
+
 -----------------
 
 function rc.proxy(address)
-    local packet = createPacket("proxy",tID,address,true)
-    local response = send(packet,"component_wrap")
+    local packet = createPacket(address,nil,true)
+    local response = send(packet,"proxy","component_wrap")
     if response == nil then return end
     local result = {}
     result.address = response.address
@@ -53,18 +68,34 @@ function rc.proxy(address)
     
     for _,name in pairs(response.functions) do
         result[name] = function(...) 
-                                    local p = createPacket("invoke",tID,address,nil,true)
+                                    local p = createPacket(address,nil,true)
                                     p.func = name
                                     p.arg = {...}
-                                    local resp,stat = send(p,"component_response")
+                                    local resp,stat = send(p,"invoke","component_response")
                                     if stat then
-                                        return true,resp
+                                        return resp,true
                                     else
-                                        return false
+                                        return nil,false
                                     end
                         end
     end
     return result
+end
+
+function rc.list()
+  local component_list = {}
+  local id= tID
+  tID=tID+1
+  modem.broadcast(port,id,"list")
+  while true do
+    local typ,receiverAddress,senderAddress,reciverPort,distance,idr,action,data = event.pull(timeout+2,"modem_message",nil,nil,port,nil,id,"component_list")
+    if typ==nil then break end
+    local response = utils.unserialize(data)
+    if response~=nil and response.data~=nil then
+      tableMerge(component_list, response.data)
+    end
+  end
+  return component_list
 end
 
 return rc

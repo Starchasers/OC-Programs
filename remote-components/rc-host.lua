@@ -43,36 +43,42 @@ local function onRemove(...)
     print("remove: "..arg[2])
 end
 
-local function createPacket(action,id,data,stat)
+local function createPacketData(data,stat)
     local packet = {}
-    packet.id = id
-    packet.action = action
     packet.data = data
     packet.status= stat
     return utils.serialize(packet)
 end
 
 local function onPacket(...)
-    local arg = {...}
-    if arg[4]~=123 then return end
-    local packet = utils.unserialize(arg[6])
-    if packet ~=nil and packet.action~=nil and packet.id~=nil then 
-        if packet.action == "proxy" and packet.address ~= nil and remote[packet.address]~=nil then
-            local data = createPacket("component_wrap",packet.id,remote[packet.address],true)
-            modem.send(arg[3],port,data)
+    local typ,receiverAddress,senderAddress,reciverPort,distance,id,action,data = table.unpack({...})
+    if reciverPort~=123 then return end
+    local packet  
+    if data~=nil then
+      packet = utils.unserialize(data)
+    end
+    if  action~=nil and id~=nil then 
+        ------------------- ACTION PROXY ----------------------------
+        if action == "proxy" and packet ~=nil and packet.address ~= nil and remote[packet.address]~=nil then
+            local data = createPacketData(remote[packet.address],true)
+            modem.send(senderAddress,port,id,"component_wrap",data)
         end
-        
+        ------------------- ACTION INVOKE ----------------------------
         local status
         local response
-        if packet.action == "invoke" and packet.address ~= nil and packet.func ~= nil and remote[packet.address]~=nil then
+        if action == "invoke" and packet ~=nil and packet.address ~= nil and packet.func ~= nil and remote[packet.address]~=nil then
             if packet.arg~=nil then
                 status, response = pcall(function() return component.invoke(packet.address,packet.func,table.unpack(packet.arg))end)
             else
                 status, response = pcall(function() return component.invoke(packet.address,packet.func)end)
             end
-                modem.send(arg[3],port,createPacket("component_response",packet.id,response,status))
+                modem.send(senderAddress,port,id,"component_response",createPacketData(response,status))
         end
-        
+        ------------------- ACTION LIST ----------------------------
+        if action == "list" then
+          modem.send(senderAddress,port,id,"component_list",createPacketData(remote,true))  
+        end     
+        ------------------------------------------------------------
     end
 
 end
@@ -84,4 +90,3 @@ wrapComponents()
 event.listen("component_added",onAdd)
 event.listen("component_removed",onRemove)
 event.listen("modem_message",onPacket)
------------------------------------------------

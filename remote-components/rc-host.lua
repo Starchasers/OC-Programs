@@ -18,6 +18,14 @@ local function addPeripheral(comp)
     remote[comp.address] = peripheral
 end
 
+local function createComponentList()
+ local response = {}
+ for address in pairs(remote) do
+    response[address] = remote[address].type
+ end
+ return  response
+end
+
 local function wrapComponents()
     remote = {}
     local it = component.list()
@@ -76,7 +84,7 @@ local function onPacket(...)
         end
         ------------------- ACTION LIST ----------------------------
         if action == "list" then
-          modem.send(senderAddress,port,id,"component_list",createPacketData(remote,true))  
+          modem.send(senderAddress,port,id,"component_list",createPacketData(createComponentList(),true))  
         end     
         ------------------------------------------------------------
     end

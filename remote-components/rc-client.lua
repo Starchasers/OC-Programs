@@ -10,23 +10,30 @@ local rc ={}
 
 modem.open(port)
 
-local function send(packet,actionTypeSend,actionTypeRecive)
+local function send(packet,actionTypeSend,actionTypeRecive,addresstoSend)
     local cId = tID
     tID=tID+1
     local id = nil
     local response = nil
     local i = 0
-    modem.broadcast(port,cId,actionTypeSend,utils.serialize(packet))
+    local tempAddress 
+    if addresstoSend==nil then
+        modem.broadcast(port,cId,actionTypeSend,utils.serialize(packet))
+    else
+        modem.send(addresstoSend,port,cId,actionTypeSend,utils.serialize(packet))
+    end
+    
     while id ~=cId and i<retry do
         local typ,receiverAddress,senderAddress,reciverPort,distance,idr,action,data = event.pull(timeout,"modem_message",nil,nil,port,nil,cId,actionTypeRecive)
         if(data~=nil)then
           response = utils.unserialize(data)
+          tempAddress = senderAddress
         end
         id=idr
         i=i+1
     end  
     if response~=nil then
-      return response.data,response.status
+      return response.data,response.status,tempAddress
     else
       return nil
     end
@@ -59,7 +66,8 @@ end
 
 function rc.proxy(address)
     local packet = createPacket(address,nil,true)
-    local response = send(packet,"proxy","component_wrap")
+    local response,stat,sender = send(packet,"proxy","component_wrap")
+    print("sender: ",sender)
     if response == nil then return end
     local result = {}
     result.address = response.address
@@ -71,7 +79,7 @@ function rc.proxy(address)
                                     local p = createPacket(address,nil,true)
                                     p.func = name
                                     p.arg = {...}
-                                    local resp,stat = send(p,"invoke","component_response")
+                                    local resp,stat = send(p,"invoke","component_response",sender)
                                     if stat then
                                         return resp,true
                                     else

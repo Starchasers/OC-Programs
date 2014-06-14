@@ -67,7 +67,6 @@ end
 function rc.proxy(address)
     local packet = createPacket(address,nil,true)
     local response,stat,sender = send(packet,"proxy","component_wrap")
-    print("sender: ",sender)
     if response == nil then return end
     local result = {}
     result.address = response.address

@@ -41,14 +41,14 @@ local function onAdd(...)
     local comp = component.proxy(arg[2])
     if comp == nil then return end
     addPeripheral(comp)
-    print("add: "..arg[2])
+   -- print("add: "..arg[2])
 end
 
 local function onRemove(...)
     local arg = {...}
     if remote[arg[2]] ==nil then return end
     remote[arg[2]]=nil
-    print("remove: "..arg[2])
+  --  print("remove: "..arg[2])
 end
 
 local function createPacketData(data,stat)
